@@ -18,6 +18,7 @@
 */
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DD_Bot.Application.Commands;
@@ -60,6 +61,7 @@ namespace DD_Bot.Application.Services
             _discordClient.MessageReceived += DiscordClient_MessageReceived;
             _discordClient.GuildAvailable += DiscordClient_GuildAvailable;
             _discordClient.SlashCommandExecuted += DiscordClient_SlashCommandExecuted;
+            _discordClient.ButtonExecuted += DiscordClient_ButtonExecuted;
             _discordClient.LoginAsync(TokenType.Bot, Setting.DiscordSettings.Token);
             _discordClient.StartAsync();
             while (true)
@@ -73,11 +75,11 @@ namespace DD_Bot.Application.Services
         {
             switch (arg.CommandName)
             {
-                case "ping":
-                    TestCommand.Execute(arg);
+                case "minecraft":
+                    TestCommand.Execute(arg, Docker, Setting.DiscordSettings);
                     return Task.CompletedTask;
                 case "docker":
-                        DockerCommand.Execute(arg, Docker, Setting.DiscordSettings);
+                    DockerCommand.Execute(arg, Docker, Setting.DiscordSettings);
                     return Task.CompletedTask;
                 case "list":
                     ListCommand.Execute(arg, Docker, Setting.DiscordSettings);
@@ -94,6 +96,21 @@ namespace DD_Bot.Application.Services
                 case "permission":
                     PermissionCommand.Execute(arg, Setting);
                     return Task.CompletedTask;
+            }
+            return Task.CompletedTask;
+        }
+
+        private Task DiscordClient_ButtonExecuted(SocketMessageComponent component)
+        {
+            switch (component.Data.CustomId)
+            {
+                case "mc-server-button-power":
+                    component.UpdateAsync(woof => woof.Content = "boo");
+                    //component.ModifyOriginalResponseAsync(woof => woof.Content = "boo.");
+                    return Task.CompletedTask;
+                    ////var menu = TestCommand.menuBuilder(true);
+                    //component.ModifyOriginalResponseAsync(woof => woof.Content = "boo.");
+                    ////component.ModifyOriginalResponseAsync(edit => edit.Components = menu.Build());
             }
             return Task.CompletedTask;
         }
