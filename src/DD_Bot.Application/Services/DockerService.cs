@@ -35,9 +35,10 @@ namespace DD_Bot.Application.Services
         private readonly IConfigurationRoot _configuration;
         private IList<ContainerListResponse> _dockerResponse;
         public List<ContainerListResponse> DockerStatus { get; private set; }
-        private readonly DockerClient _client = new DockerClientConfiguration(
-                new Uri("unix:///var/run/docker.sock"))
-            .CreateClient();
+        private readonly DockerClient _client = new DockerClientConfiguration().CreateClient();
+        //private readonly DockerClient _client = new DockerClientConfiguration(
+        //        new Uri("unix:///var/run/docker.sock"))
+        //    .CreateClient();
 
         public DockerSettings Settings => _configuration.Get<Settings>().DockerSettings;
         public DockerService(IConfigurationRoot configuration) // Initialising
@@ -104,6 +105,11 @@ namespace DD_Bot.Application.Services
         public async void DockerCommandRestart(string id)
         {
             await _client.Containers.RestartContainerAsync(id, new ContainerRestartParameters());
+        }
+
+        public async Task dockerCheckStatus(string id)
+        {
+            await _client.Containers.InspectContainerAsync(id);
         }
         
         public void Start()

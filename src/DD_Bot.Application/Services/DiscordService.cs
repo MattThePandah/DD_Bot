@@ -105,7 +105,7 @@ namespace DD_Bot.Application.Services
             switch (component.Data.CustomId)
             {
                 case "mc-server-button-power":
-                    component.UpdateAsync(woof => woof.Content = "boo");
+                    TestCommand.ServerPower(Docker, component);
                     //component.ModifyOriginalResponseAsync(woof => woof.Content = "boo.");
                     return Task.CompletedTask;
                     ////var menu = TestCommand.menuBuilder(true);

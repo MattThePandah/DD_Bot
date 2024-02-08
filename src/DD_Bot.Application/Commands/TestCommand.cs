@@ -17,14 +17,18 @@
 
 */
 
+using DD_Bot.Application.Interfaces;
 using DD_Bot.Application.Services;
 using DD_Bot.Domain;
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Docker.DotNet.Models;
+using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -49,81 +53,57 @@ namespace DD_Bot.Application.Commands
                 Name = "minecraft",
                 Description = "Creates minecraft menu"
             };
+            builder.AddOption(
+                "container",
+                ApplicationCommandOptionType.String,
+                "Docker container used",
+                true
+            );
             return builder.Build();
         }
-
-        //public static ApplicationCommandProperties Create()
-        //{
-        //    var builder = new SlashCommandBuilder()
-        //    {
-        //        Name = "ping",
-        //        Description = "Ping"
-        //    };
-        //    return builder.Build();
-        //}
 
         #endregion
 
         #region ExecuteCommand
 
-        //[ComponentInteraction("button")]
-        //public async Task HandleButtonInput()
-        //{
-        //    ulong id = 1204513253212823603;
-        //    var channel = _discord.GetChannel(id) as IMessageChannel;
-        //    await channel.SendMessageAsync("I pressed a button.");
-        //}
-
         public static async void Execute(SocketSlashCommand arg, DockerService dockerService, DiscordSettings settings)
         {
             await arg.RespondAsync("Contacting Docker Service...");
-            //await arg.RespondAsync("woof.");
-            //await dockerService.DockerUpdate();
+            await dockerService.DockerUpdate();
 
-            bool serverStatus = true;
+            var containerName = arg.Data.Options.FirstOrDefault(option => option.Name == "container")?.Value as string;
 
-            EmbedBuilder embedBuilder = new EmbedBuilder
+            if (string.IsNullOrEmpty(containerName))
             {
-                Title = "Minecraft Server - All The Mods 9",
-                Description = "**Server status:** %value%"
-
-            };
-            embedBuilder.AddField("Online Players", "```ml\n%value%```", true)
-            .WithColor(Color.Green);
-            ComponentBuilder builder;
-
-            if (serverStatus)
-            {
-                builder = menuBuilder(true);
-            } 
-            else
-            {
-                builder = menuBuilder(false);
+                await arg.ModifyOriginalResponseAsync(edit => edit.Content = "No name has been specified");
+                return;
             }
+
+            var docker = dockerService.DockerStatus.FirstOrDefault(docker => docker.Names[0] == containerName);
+
+            if (containerName == null)
+            {
+                await arg.ModifyOriginalResponseAsync(edit => edit.Content = $"{containerName} doesn't exist.");
+                return;
+            }
+
+            var dockerId = docker.ID;
+
+            bool serverStatus = dockerService.RunningDockers.Contains(containerName);
 
             await arg.ModifyOriginalResponseAsync(edit =>
             {
                 edit.Content = "";
-                edit.Embed = embedBuilder.Build();
-                edit.Components = builder.Build();
+                edit.Embed = embedBuilder(serverStatus, containerName).Build();
+                edit.Components = menuBuilder(serverStatus).Build();
             });
-            //await arg.ModifyOriginalResponseAsync(edit => edit.Content = " ");
-            //await arg.ModifyOriginalResponseAsync(edit =>
-            //{
-            //    edit.Embed = embedBuilder.Build();
-            //    edit.Components = builder.Build();
-            //});
-            //await arg.ModifyOriginalResponseAsync(edit => edit.Content = "Test", Component: builder.Build())
-            //await arg.RespondAsync("Minecraft server", components: builder.Build());
-
-            //await arg.ModifyOriginalResponseAsync(edit => "test", components: builder.Build());
         }
 
         #endregion
 
-        public static ComponentBuilder menuBuilder(bool test)
+        public static ComponentBuilder menuBuilder(bool serverStatus)
         {
-            if (test)
+            if (serverStatus)
             {
                 ComponentBuilder builder = new ComponentBuilder().WithButton("Stop Server", "mc-server-button-power", ButtonStyle.Danger)
                     .WithButton("Restart", "mc-server-button-restart");
@@ -136,33 +116,67 @@ namespace DD_Bot.Application.Commands
             }
         }
 
-        public static void ServerPower()
+        public static EmbedBuilder embedBuilder(bool serverStatus, string containerName)
         {
-            bool serverRunning = true;
-
-            if (serverRunning)
+            EmbedBuilder embedBuilder = new EmbedBuilder
             {
-                
+                Title = "Minecraft Server - All The Mods 9",
+                Description = "**Server status:** Offine",
+
+            };
+            embedBuilder.WithFooter(footer => footer.Text = containerName);
+            if (serverStatus)
+            {
+                embedBuilder.AddField("Online Players", "```ml\n%value%```", true).WithColor(Color.Green);
+                embedBuilder.Description = "**Server status:** Online";
+
             }
+
+            return embedBuilder;
         }
 
-        //public static void GoFuckYourself()
-        //{
-        //    if (serverStatus)
-        //    {
-        //        test = "Stop Server";
-        //        var builder = new ComponentBuilder().WithButton(test, "mc-server-button-power").WithButton("Restart", "mc-server-button-restart");
-        //        await arg.ModifyOriginalResponseAsync(edit => edit.Content = "Minecraft server: %status%");
-        //        await arg.ModifyOriginalResponseAsync(edit => edit.Components = builder.Build());
-        //    }
-        //    else
-        //    {
-        //        test = "Start Server";
-        //        var builder = new ComponentBuilder().WithButton(test, "mc-server-button-power");
-        //        await arg.ModifyOriginalResponseAsync(edit => edit.Content = "Minecraft server: %status%");
-        //        await arg.ModifyOriginalResponseAsync(edit => edit.Components = builder.Build());
-        //    }
-        //}
-    }
+        /// <summary>
+        /// This is the most jank piece of crap i have ever written.
+        /// </summary>
+        /// <param name="dockerService">Takes a Docker Server to find out what containers are running</param>
+        /// <param name="component">Takes a SocketMessageComponent</param>
+        /// <returns></returns>
+        public static async Task ServerPower(DockerService dockerService, SocketMessageComponent component)
+        {
+            await dockerService.DockerUpdate();
+            var containerName = component.Message.Embeds.FirstOrDefault()?.Footer?.Text;
 
+            var docker = dockerService.DockerStatus.FirstOrDefault(d => d.Names[0] == containerName);
+            var dockerId = docker?.ID;
+
+            if (dockerId != null)
+            {
+                bool serverRunning = dockerService.RunningDockers.Contains(containerName);
+
+                if (serverRunning)
+                {
+                    dockerService.DockerCommandStop(dockerId);
+                    serverRunning = false;
+                }
+                else
+                {
+                    dockerService.DockerCommandStart(dockerId);
+                    serverRunning = true;
+                }
+
+                await Task.Delay(30); // Use Task.Delay instead of Thread.Sleep
+                await dockerService.DockerUpdate();
+
+                var embed = embedBuilder(serverRunning, containerName).Build();
+                var components = menuBuilder(serverRunning).Build();
+
+                // UpdateAsync may not return a Task, so you can call it directly without await
+                component.UpdateAsync(edit =>
+                {
+                    edit.Embed = embed;
+                    edit.Components = components;
+                });
+            }
+        }
+    }
 }
