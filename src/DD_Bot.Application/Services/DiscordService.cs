@@ -71,12 +71,17 @@ namespace DD_Bot.Application.Services
             // ReSharper disable once FunctionNeverReturns
         }
 
+        private void RunDailyEvents()
+        {
+            throw new NotImplementedException();
+        }
+
         private Task DiscordClient_SlashCommandExecuted(SocketSlashCommand arg)
         {
             switch (arg.CommandName)
             {
                 case "minecraft":
-                    TestCommand.Execute(arg, Docker, Setting.DiscordSettings);
+                    MinecraftCommand.Execute(arg, Docker, Setting.DiscordSettings);
                     return Task.CompletedTask;
                 case "docker":
                     DockerCommand.Execute(arg, Docker, Setting.DiscordSettings);
@@ -105,12 +110,8 @@ namespace DD_Bot.Application.Services
             switch (component.Data.CustomId)
             {
                 case "mc-server-button-power":
-                    TestCommand.ServerPower(Docker, component);
-                    //component.ModifyOriginalResponseAsync(woof => woof.Content = "boo.");
+                    MinecraftCommand.ServerPower(Docker, component);
                     return Task.CompletedTask;
-                    ////var menu = TestCommand.menuBuilder(true);
-                    //component.ModifyOriginalResponseAsync(woof => woof.Content = "boo.");
-                    ////component.ModifyOriginalResponseAsync(edit => edit.Components = menu.Build());
             }
             return Task.CompletedTask;
         }
@@ -120,7 +121,7 @@ namespace DD_Bot.Application.Services
             await Task.Run(() =>
             {
                 guild.CreateApplicationCommandAsync(DockerCommand.Create());
-                guild.CreateApplicationCommandAsync(TestCommand.Create());
+                guild.CreateApplicationCommandAsync(MinecraftCommand.Create());
                 guild.CreateApplicationCommandAsync(ListCommand.Create());
                 guild.CreateApplicationCommandAsync(AdminCommand.Create());
                 guild.CreateApplicationCommandAsync(UserCommand.Create());

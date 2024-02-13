@@ -34,12 +34,12 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace DD_Bot.Application.Commands
 {
-    public class TestCommand
+    public class MinecraftCommand
     {
 
         private DiscordSocketClient _discord;
 
-        public TestCommand(DiscordSocketClient discord)
+        public MinecraftCommand(DiscordSocketClient discord)
         {
             _discord = discord;
         }
